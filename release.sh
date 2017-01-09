@@ -44,23 +44,32 @@ done
 
 changelog_status=$(git status -s | grep CHANGELOG.md)
 
+set -e
+
 if [ "${changelog_status}" == " M CHANGELOG.md" ]; then
   git add CHANGELOG.md
   changelog_status=$(git status -s | grep CHANGELOG.md)
 fi
 
 if [ "${changelog_status}" == "M  CHANGELOG.md" ]; then
+  message green "==> Committing CHANGELOG.md <=="
   git commit -m "$(echo -e "Release v${release}\n\nSee CHANGELOG.md for more details.")"
 fi
 
+
+message green "==> Tagging Release v${release} <=="
 git tag "v${release}" -m "$(echo -e "Release v${release}\n\nSee CHANGELOG.md for more details.")"
 
 new_prerelease="${semver[0]}.${semver[1]}.$((semver[2]+1))-pre"
 
+message green "==> Bumping CHANGELOG.md to Release v${new_prerelease} <=="
 echo -e "## ${new_prerelease}\n\nBumped version for dev.\n\n$(cat CHANGELOG.md)" > CHANGELOG.md
 
 git add CHANGELOG.md
 git commit -m "Bump CHANGELOG.md to v${new_prerelease}"
 
+message green "==> Pushing Commits and Tags <=="
 git push origin master
 git push origin --tags
+
+message ok "\nRelease v${release} successful."
