@@ -69,7 +69,7 @@ git add CHANGELOG.md
 git commit -m "Bump CHANGELOG.md to v${new_prerelease}"
 
 message begin "==> Pushing Commits and Tags <=="
-git push origin master
+git push origin "$(git ls-remote --symref origin HEAD | head -n1 | awk '{print $2}')"
 git push origin --tags
 
 message ok "\nRelease v${release} successful."
