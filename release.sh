@@ -1,8 +1,5 @@
 #!/usr/bin/env bash
 
-# The release from CHANGELOG.md.
-release=$(head -n 1 CHANGELOG.md | awk '{print $2}')
-
 # message prints text with a color, redirected to stderr in the event of
 # warning or error messages.
 message() {
@@ -19,37 +16,60 @@ message() {
   if [ -z "${__colors[$__type]}" ]; then
     __type="info"
   fi
-  if [[ ! "${__type}" =~ ^(warning|error)$ ]]; then
+  if [[ "${__type}" == "error" ]]; then
     echo -e "\e[${__colors[$__type]}m${__message}\e[0m" 1>&2
   else
     echo -e "\e[${__colors[$__type]}m${__message}\e[0m"
   fi
 }
 
-if [[ "${release}" == *"-pre" ]]; then
-  message error "This is a pre-release - release aborted." >&2
-  message error "Please update the first line in CHANGELOG.md to a version without the -pre tag."
+if [[ "$(head -n 1 CHANGELOG.md | cut -d ' ' -f 3-)" != "(Unreleased)" ]]; then
+  message error "The changelog must have \"Unreleased\" in brackets next to its version number in order to be used by this tool."
   exit 1
 fi
 
-semver=(${release//./ })
+release=$(head -n 1 CHANGELOG.md | awk '{print $2}')
+IFS="." read -r -a semver <<< "${release}"
+major="${semver[0]}"
+minor="${semver[1]}"
+IFS="-+" read -r -a patchpremeta <<< "${semver[2]}"
+patch="${patchpremeta[0]}"
+extra="${patchpremeta[1]}"
 
-for n in 0 1 2; do 
-  if ! [ "${semver[$n]}" -eq "${semver[$n]}" ]; then
-    message error "${release} is not a proper semantic-versioned release." >&2
+for x in "${major}" "${minor}" "${patch}"; do 
+  if ! [ "${x}" -eq "${x}" ]; then
+    message error "${release} is not a proper semantic-versioned release."
     message error "Please update the first line in CHANGELOG.md to a numeric MAJOR.MINOR.PATCH version."
     exit 1
   fi
 done
 
+if [[ "${extra}" == "pre" ]]; then
+  message error "Pre-releases tagged as \"pre\" are not supported. Release aborted."
+  message error "Please update the first line in CHANGELOG.md to a version without the -pre tag,"
+  message error "or use a different pre-release tag (i.e. beta)."
+  exit 1
+fi
+
 changelog_status=$(git status -s | grep CHANGELOG.md)
+
+if [[ -t 0 ]]; then
+  message warning "You are releasing: ${release}"
+  message warning "Type \"yes\" to continue, anything else to abort."
+  prompt="$(message info "Continue?")"
+  read -r -p "${prompt} " confirm
+  if [[ "${confirm}" != "yes" ]]; then
+    message error "Release aborted."
+    exit 1
+  fi
+fi
 
 set -e
 
-if [ "${changelog_status}" == " M CHANGELOG.md" ]; then
-  git add CHANGELOG.md
-  changelog_status=$(git status -s | grep CHANGELOG.md)
-fi
+# Timestamp and update version in changelog
+message begin "==> Timetsamping current release in CHANGELOG.md <=="
+current_date="$(date "+%B %e, %Y" | sed -E -e 's/  / /')"
+echo -e "## ${release} (${current_date})\n$(tail -n +2 CHANGELOG.md)" > CHANGELOG.md
 
 if [ "${changelog_status}" == "M  CHANGELOG.md" ]; then
   message begin "==> Committing CHANGELOG.md <=="
@@ -60,10 +80,16 @@ fi
 message begin "==> Tagging Release v${release} <=="
 git tag "v${release}" -m "$(echo -e "Release v${release}\n\nSee CHANGELOG.md for more details.")"
 
+if [[ "${extra}" != "" ]]; then
+  # We just drop the pre-release tags from the release information and don't increment.
+  message warning "NOTE: extra pre-release and metadata tags have been dropped from new version."
+  message warning "Manual modification may be necessary post-release."
+fi
+  
 new_prerelease="${semver[0]}.${semver[1]}.$((semver[2]+1))-pre"
 
 message begin "==> Bumping CHANGELOG.md to Release v${new_prerelease} <=="
-echo -e "## ${new_prerelease}\n\nBumped version for dev.\n\n$(cat CHANGELOG.md)" > CHANGELOG.md
+echo -e "## ${new_prerelease} (Unreleased)\n\nBumped version for dev.\n\n$(cat CHANGELOG.md)" > CHANGELOG.md
 
 git add CHANGELOG.md
 git commit -m "Bump CHANGELOG.md to v${new_prerelease}"
