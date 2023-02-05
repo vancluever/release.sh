@@ -51,7 +51,6 @@ if [[ "${extra}" == "pre" ]]; then
   exit 1
 fi
 
-changelog_status=$(git status -s | grep CHANGELOG.md)
 
 if [[ -t 0 ]]; then
   message warning "You are releasing: ${release}"
@@ -71,11 +70,8 @@ message begin "==> Timetsamping current release in CHANGELOG.md <=="
 current_date="$(date "+%B %e, %Y" | sed -E -e 's/  / /')"
 echo -e "## ${release} (${current_date})\n$(tail -n +2 CHANGELOG.md)" > CHANGELOG.md
 
-if [ "${changelog_status}" == "M  CHANGELOG.md" ]; then
-  message begin "==> Committing CHANGELOG.md <=="
-  git commit -m "$(echo -e "Release v${release}\n\nSee CHANGELOG.md for more details.")"
-fi
-
+message begin "==> Committing CHANGELOG.md <=="
+git commit -m "$(echo -e "Release v${release}\n\nSee CHANGELOG.md for more details.")"
 
 message begin "==> Tagging Release v${release} <=="
 git tag "v${release}" -m "$(echo -e "Release v${release}\n\nSee CHANGELOG.md for more details.")"
