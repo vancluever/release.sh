@@ -71,6 +71,7 @@ current_date="$(date "+%B %e, %Y" | sed -E -e 's/  / /')"
 echo -e "## ${release} (${current_date})\n$(tail -n +2 CHANGELOG.md)" > CHANGELOG.md
 
 message begin "==> Committing CHANGELOG.md <=="
+git add CHANGELOG.md
 git commit -m "$(echo -e "Release v${release}\n\nSee CHANGELOG.md for more details.")"
 
 message begin "==> Tagging Release v${release} <=="
